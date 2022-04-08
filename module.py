@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn
+import low_rank_tensor as LowRankTensor
+from tensor_times_matrix import tensor_times_matrix_fwd
 
 class AdaptiveRankLinear(nn.Module):
     
@@ -21,4 +24,27 @@ class AdaptiveRankLinear(nn.Module):
 
         super().__init__()
 
+        self.weight_tensor = getattr(LowRankTensor, tensor_type)(in_features, out_features, max_rank, prior_type, eta, device, dtype)
         
+       # initialize bias
+        if bias:
+            self.bias = nn.Parameter(torch.zeros((out_features,), device=device, dtype=dtype))
+        else:
+            self.bias = None
+
+    def forward(self, x):
+
+        output = tensor_times_matrix_fwd(self.weight_tensor.tensor, x.T)
+
+        if self.bias is not None:
+            output = output + self.bias
+            
+        return output
+
+    def get_log_prior(self):
+
+        return self.weight_tensor.get_log_prior()
+
+    def estimate_rank(self):
+
+        return self.weight_tensor.estimate_rank()

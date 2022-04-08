@@ -1,10 +1,9 @@
-from cmath import log
 import tltorch
 import torch
 import torch.nn as nn
 from torch.distributions.half_cauchy import HalfCauchy
 from torch.distributions.normal import Normal
-from tensor_fusion.distribution import LogUniform
+from distribution import LogUniform
 import numpy as np
 
 class LowRankTensor(nn.Module):
@@ -20,6 +19,11 @@ class LowRankTensor(nn.Module):
         '''
 
         super().__init__()
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.device = device
+        self.dtype = dtype
 
         # initialize rank parameter prior
         if prior_type == 'half_cauchy':
@@ -83,6 +87,8 @@ class CP(LowRankTensor):
         # the log prior of rank parameter
         log_prior = torch.sum(self.rank_parameter_prior_distribution.log_prob(self.rank_parameter))
         
+        # for rank parameter, get the log prior of the i-th column of the factor matrices
+        # where the prior is 0-mean Gaussian with stddev=rank_parameter[i]
         for i in range(self.max_rank):
             column_prior = Normal(0, self.rank_parameter[i])
             for factor in self.tensor.factors:
@@ -142,7 +148,7 @@ class TT(LowRankTensor):
         log_prior = 0.0
         for rank_parameter in self.rank_parameters:
             with torch.no_grad():
-                rank_parameter[:] = rank_parameter.clamp(1e-10, 1e10)
+                rank_parameter[:] = rank_parameter.clamp(1e-30, 1e30)
             log_prior = log_prior + torch.sum(self.rank_parameter_prior_distribution.log_prob(rank_parameter))
 
         for n, rank_parameter in enumerate(self.rank_parameters):
